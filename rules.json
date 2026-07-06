@@ -1,0 +1,644 @@
+{
+  "dataset": "trades",
+  "parquet_path": "./trades.parquet",
+  "business_date": "2025-12-31",
+  "generated_rows": 50000000,
+  "setup": {
+    "sql_macros": [
+      "CREATE OR REPLACE MACRO luhn_ok(x) AS (\n x IS NULL OR (length(x)>0 AND (list_reduce(list_transform(range(1,length(x)+1),\n   j -> CASE WHEN ((length(x)-j)%2)=1 THEN (CASE WHEN CAST(x[j] AS INT)*2>9 THEN CAST(x[j] AS INT)*2-9 ELSE CAST(x[j] AS INT)*2 END) ELSE CAST(x[j] AS INT) END),\n   (a,b)->a+b) % 10)=0))",
+      "CREATE OR REPLACE MACRO geo_within(g,clat,clon,km) AS (\n g IS NULL OR 6371*2*asin(sqrt(pow(sin((radians(CAST(split_part(g,',',1) AS DOUBLE))-radians(clat))/2),2)\n + cos(radians(clat))*cos(radians(CAST(split_part(g,',',1) AS DOUBLE)))*pow(sin((radians(CAST(split_part(g,',',2) AS DOUBLE))-radians(clon))/2),2)))<=km)"
+    ],
+    "python_udfs": [
+      {
+        "name": "py_address_valid",
+        "params": [
+          "VARCHAR"
+        ],
+        "returns": "BOOLEAN"
+      },
+      {
+        "name": "py_record_anomaly",
+        "params": [
+          "DOUBLE",
+          "DOUBLE",
+          "BIGINT"
+        ],
+        "returns": "BOOLEAN"
+      }
+    ]
+  },
+  "rules": [
+    {
+      "id": "DS_RECORD_COUNT_BETWEEN",
+      "dimension": "Dataset",
+      "business_label": "Trade count is within the expected range",
+      "columns": [
+        "*"
+      ],
+      "result_kind": "dataset",
+      "sql": "count(*) BETWEEN 1 AND 200000000"
+    },
+    {
+      "id": "SCH_FIELDS_SET",
+      "dimension": "Schema",
+      "business_label": "All expected columns are present",
+      "columns": [
+        "*"
+      ],
+      "result_kind": "schema_fields",
+      "expected": [
+        "trade_id",
+        "client_id",
+        "parent_order_id",
+        "trade_ref",
+        "isin",
+        "ticker",
+        "side",
+        "currency",
+        "settlement_ccy",
+        "venue",
+        "status",
+        "asset_class",
+        "quantity",
+        "price",
+        "gross_amount",
+        "fees",
+        "tax",
+        "net_amount",
+        "notional",
+        "trade_date",
+        "settlement_date",
+        "booked_ts",
+        "trader_lei",
+        "counterparty",
+        "risk_score",
+        "metadata",
+        "tags",
+        "is_cancelled",
+        "book_geo",
+        "region",
+        "sub_region",
+        "account_no",
+        "address",
+        "qty_str",
+        "date_str",
+        "account_age_yrs",
+        "notes",
+        "cash_flow"
+      ]
+    },
+    {
+      "id": "SCH_FIELD_TYPE",
+      "dimension": "Schema",
+      "business_label": "Key columns have the expected data types",
+      "columns": [
+        "notional",
+        "trade_date",
+        "quantity",
+        "trade_id"
+      ],
+      "result_kind": "schema_types",
+      "expected": {
+        "notional": "DOUBLE",
+        "trade_date": "DATE",
+        "quantity": "BIGINT",
+        "trade_id": "BIGINT"
+      }
+    },
+    {
+      "id": "COMP_NOT_NULL",
+      "dimension": "Completeness",
+      "business_label": "Trade ID is present",
+      "columns": [
+        "trade_id"
+      ],
+      "result_kind": "row",
+      "sql": "trade_id IS NOT NULL"
+    },
+    {
+      "id": "COMP_STR_NOT_BLANK",
+      "dimension": "Completeness",
+      "business_label": "ISIN is present and not blank",
+      "columns": [
+        "isin"
+      ],
+      "result_kind": "row",
+      "sql": "isin IS NOT NULL AND trim(isin)<>''"
+    },
+    {
+      "id": "COMP_NUM_NOT_NAN",
+      "dimension": "Completeness",
+      "business_label": "Notional is a real number (no NaN or infinity)",
+      "columns": [
+        "notional"
+      ],
+      "result_kind": "row",
+      "sql": "notional IS NOT NULL AND isfinite(notional)"
+    },
+    {
+      "id": "VAL_IN_SET_CCY",
+      "dimension": "Validity",
+      "business_label": "Currency is a known ISO code",
+      "columns": [
+        "currency"
+      ],
+      "result_kind": "row",
+      "sql": "currency IN ('USD','EUR','GBP','JPY','AUD','CAD')"
+    },
+    {
+      "id": "VAL_IN_SET_STATUS",
+      "dimension": "Validity",
+      "business_label": "Status is a valid value",
+      "columns": [
+        "status"
+      ],
+      "result_kind": "row",
+      "sql": "status IN ('NEW','FILLED','SETTLED','CANCELLED')"
+    },
+    {
+      "id": "VAL_IN_SET_VENUE",
+      "dimension": "Validity",
+      "business_label": "Venue is on the approved list",
+      "columns": [
+        "venue"
+      ],
+      "result_kind": "row",
+      "sql": "venue IN ('XLON','XNYS','XPAR','XETR','XTKS')"
+    },
+    {
+      "id": "VAL_IN_SET_ASSET",
+      "dimension": "Validity",
+      "business_label": "Asset class is valid",
+      "columns": [
+        "asset_class"
+      ],
+      "result_kind": "row",
+      "sql": "asset_class IN ('EQUITY','BOND','FX','DERIV')"
+    },
+    {
+      "id": "VAL_BETWEEN_QTY",
+      "dimension": "Validity",
+      "business_label": "Quantity is a sensible amount",
+      "columns": [
+        "quantity"
+      ],
+      "result_kind": "row",
+      "sql": "quantity BETWEEN 1 AND 10000000"
+    },
+    {
+      "id": "VAL_MAX_DECIMAL_PLACES",
+      "dimension": "Validity",
+      "business_label": "Price is within tick precision (<=4 dp)",
+      "columns": [
+        "price"
+      ],
+      "result_kind": "row",
+      "sql": "price IS NULL OR round(price,4)=price"
+    },
+    {
+      "id": "VAL_LENGTH_BETWEEN_LEI",
+      "dimension": "Validity",
+      "business_label": "Trader LEI is 20 characters",
+      "columns": [
+        "trader_lei"
+      ],
+      "result_kind": "row",
+      "sql": "trader_lei IS NULL OR length(trader_lei)=20"
+    },
+    {
+      "id": "VAL_REGEX_MATCH_ISIN",
+      "dimension": "Validity",
+      "business_label": "ISIN has a valid format",
+      "columns": [
+        "isin"
+      ],
+      "result_kind": "row",
+      "sql": "isin IS NULL OR regexp_matches(isin,'^[A-Z]{2}[A-Z0-9]{9}[0-9]$')"
+    },
+    {
+      "id": "VAL_LIKE_REF",
+      "dimension": "Validity",
+      "business_label": "Trade reference matches TRD- pattern",
+      "columns": [
+        "trade_ref"
+      ],
+      "result_kind": "row",
+      "sql": "trade_ref LIKE 'TRD-%'"
+    },
+    {
+      "id": "VAL_ILIKE_REF",
+      "dimension": "Validity",
+      "business_label": "Trade reference matches pattern (case-insensitive)",
+      "columns": [
+        "trade_ref"
+      ],
+      "result_kind": "row",
+      "sql": "trade_ref ILIKE 'trd-%'"
+    },
+    {
+      "id": "VAL_STARTS_WITH_ISIN",
+      "dimension": "Validity",
+      "business_label": "ISIN starts with a country code",
+      "columns": [
+        "isin"
+      ],
+      "result_kind": "row",
+      "sql": "starts_with(isin,'GB')"
+    },
+    {
+      "id": "VAL_CONTAINS_NOTES",
+      "dimension": "Validity",
+      "business_label": "Notes contain a verification marker",
+      "columns": [
+        "notes"
+      ],
+      "result_kind": "row",
+      "sql": "contains(notes,'VERIFIED')"
+    },
+    {
+      "id": "VAL_FUZZY_MATCH_CP",
+      "dimension": "Validity",
+      "business_label": "Counterparty matches a known name (typo-tolerant)",
+      "columns": [
+        "counterparty"
+      ],
+      "result_kind": "row",
+      "sql": "list_min(list_transform(['GOLDMAN SACHS','MORGAN STANLEY','JP MORGAN','BARCLAYS'], n -> levenshtein(upper(counterparty),n)))<=2"
+    },
+    {
+      "id": "VAL_TYPE_PARSEABLE_QTY",
+      "dimension": "Validity",
+      "business_label": "Quantity string parses as a number",
+      "columns": [
+        "qty_str"
+      ],
+      "result_kind": "row",
+      "sql": "try_cast(qty_str AS BIGINT) IS NOT NULL"
+    },
+    {
+      "id": "VAL_DATE_FORMAT",
+      "dimension": "Validity",
+      "business_label": "Date string is a valid date",
+      "columns": [
+        "date_str"
+      ],
+      "result_kind": "row",
+      "sql": "try_strptime(date_str,'%Y-%m-%d') IS NOT NULL"
+    },
+    {
+      "id": "VAL_AGE_BETWEEN",
+      "dimension": "Validity",
+      "business_label": "Account age is plausible",
+      "columns": [
+        "account_age_yrs"
+      ],
+      "result_kind": "row",
+      "sql": "account_age_yrs BETWEEN 0 AND 100"
+    },
+    {
+      "id": "VAL_DOW_IN_SET",
+      "dimension": "Validity",
+      "business_label": "Trade booked on a business day",
+      "columns": [
+        "trade_date"
+      ],
+      "result_kind": "row",
+      "sql": "isodow(trade_date) BETWEEN 1 AND 5"
+    },
+    {
+      "id": "VAL_NOT_FUTURE",
+      "dimension": "Validity",
+      "business_label": "Trade date is not in the future",
+      "columns": [
+        "trade_date"
+      ],
+      "result_kind": "row",
+      "sql": "trade_date <= DATE '2025-12-31'"
+    },
+    {
+      "id": "VAL_BOOL_IS_FALSE",
+      "dimension": "Validity",
+      "business_label": "Trade is not flagged cancelled",
+      "columns": [
+        "is_cancelled"
+      ],
+      "result_kind": "row",
+      "sql": "is_cancelled = FALSE"
+    },
+    {
+      "id": "VAL_JSON_PARSEABLE",
+      "dimension": "Validity",
+      "business_label": "Metadata is valid JSON",
+      "columns": [
+        "metadata"
+      ],
+      "result_kind": "row",
+      "sql": "json_valid(metadata)"
+    },
+    {
+      "id": "VAL_JSON_HAS_KEY",
+      "dimension": "Validity",
+      "business_label": "Metadata has a source system",
+      "columns": [
+        "metadata"
+      ],
+      "result_kind": "row",
+      "sql": "NOT json_valid(metadata) OR json_extract_string(CASE WHEN json_valid(metadata) THEN metadata ELSE '{}' END,'$.source_system') IS NOT NULL"
+    },
+    {
+      "id": "VAL_JSON_ARRAY_LEN",
+      "dimension": "Validity",
+      "business_label": "Allocation array is a sensible size",
+      "columns": [
+        "metadata"
+      ],
+      "result_kind": "row",
+      "sql": "NOT json_valid(metadata) OR coalesce(json_array_length(json_extract(CASE WHEN json_valid(metadata) THEN metadata ELSE '{}' END,'$.allocations')),0) BETWEEN 1 AND 50"
+    },
+    {
+      "id": "LIST_CONTAINS",
+      "dimension": "Validity",
+      "business_label": "Tags include a required tag",
+      "columns": [
+        "tags"
+      ],
+      "result_kind": "row",
+      "sql": "list_contains(tags,'EQUITY')"
+    },
+    {
+      "id": "LIST_LENGTH_BETWEEN",
+      "dimension": "Validity",
+      "business_label": "Tag count is within range",
+      "columns": [
+        "tags"
+      ],
+      "result_kind": "row",
+      "sql": "len(tags) BETWEEN 1 AND 10"
+    },
+    {
+      "id": "LIST_NO_DUPLICATES",
+      "dimension": "Validity",
+      "business_label": "No repeated tags",
+      "columns": [
+        "tags"
+      ],
+      "result_kind": "row",
+      "sql": "len(tags)=len(list_distinct(tags))"
+    },
+    {
+      "id": "COND_IF_THEN",
+      "dimension": "Consistency",
+      "business_label": "If settled, a settlement date is present",
+      "columns": [
+        "status",
+        "settlement_date"
+      ],
+      "result_kind": "row",
+      "sql": "status<>'SETTLED' OR settlement_date IS NOT NULL"
+    },
+    {
+      "id": "MULT_FIELD_EXPR_EQ",
+      "dimension": "Consistency",
+      "business_label": "Net equals gross minus fees and tax (tolerance)",
+      "columns": [
+        "net_amount",
+        "gross_amount",
+        "fees",
+        "tax"
+      ],
+      "result_kind": "row",
+      "sql": "abs(net_amount-(gross_amount-fees-tax))<=0.01"
+    },
+    {
+      "id": "MULT_FIELD_COMPARE_GT",
+      "dimension": "Consistency",
+      "business_label": "Settlement date is on or after trade date",
+      "columns": [
+        "settlement_date",
+        "trade_date"
+      ],
+      "result_kind": "row",
+      "sql": "settlement_date IS NULL OR settlement_date>=trade_date"
+    },
+    {
+      "id": "MULT_FIELD_BOTH_NULL",
+      "dimension": "Consistency",
+      "business_label": "Counterparty and LEI are both present or both absent",
+      "columns": [
+        "counterparty",
+        "trader_lei"
+      ],
+      "result_kind": "row",
+      "sql": "(counterparty IS NULL)=(trader_lei IS NULL)"
+    },
+    {
+      "id": "MULT_FIELD_COMB_IN_SET",
+      "dimension": "Consistency",
+      "business_label": "Region and sub-region are a valid pair",
+      "columns": [
+        "region",
+        "sub_region"
+      ],
+      "result_kind": "row",
+      "sql": "(region,sub_region) IN (('EMEA','LONDON'),('AMER','NEW YORK'),('APAC','TOKYO'))"
+    },
+    {
+      "id": "MULT_FIELD_SIGN",
+      "dimension": "Consistency",
+      "business_label": "Buy/sell agrees with the cash-flow sign",
+      "columns": [
+        "side",
+        "cash_flow"
+      ],
+      "result_kind": "row",
+      "sql": "(side='BUY' AND cash_flow<=0) OR (side='SELL' AND cash_flow>=0)"
+    },
+    {
+      "id": "STAT_OUTLIER_ZSCORE",
+      "dimension": "Validity",
+      "business_label": "Risk score is not a statistical outlier (>3 sigma)",
+      "columns": [
+        "risk_score"
+      ],
+      "result_kind": "row",
+      "sql": "abs(risk_score-(SELECT avg(risk_score) FROM {src}))<=3*(SELECT stddev_pop(risk_score) FROM {src})"
+    },
+    {
+      "id": "STAT_EXTREME_P99",
+      "dimension": "Validity",
+      "business_label": "Notional is not an extreme value (above p99)",
+      "columns": [
+        "notional"
+      ],
+      "result_kind": "row",
+      "sql": "notional IS NULL OR NOT isfinite(notional) OR notional <= (SELECT approx_quantile(notional,0.99) FROM {src} WHERE isfinite(notional))"
+    },
+    {
+      "id": "CUSTOM_SQL_CHECKSUM",
+      "dimension": "Validity",
+      "business_label": "Account number passes a checksum (Luhn)",
+      "columns": [
+        "account_no"
+      ],
+      "result_kind": "row",
+      "sql": "luhn_ok(account_no)",
+      "requires": [
+        "luhn"
+      ]
+    },
+    {
+      "id": "CUSTOM_SQL_GEO_WITHIN",
+      "dimension": "Validity",
+      "business_label": "Booking origin is within the allowed region",
+      "columns": [
+        "book_geo"
+      ],
+      "result_kind": "row",
+      "sql": "geo_within(book_geo,51.5,0.12,50)",
+      "requires": [
+        "geo"
+      ]
+    },
+    {
+      "id": "CUSTOM_PY_ADDRESS_VALID",
+      "dimension": "Validity",
+      "business_label": "Counterparty address is well formed",
+      "columns": [
+        "address"
+      ],
+      "result_kind": "row",
+      "sql": "py_address_valid(address)",
+      "requires": [
+        "py_address_valid"
+      ]
+    },
+    {
+      "id": "CUSTOM_PY_RECORD_ANOMALY",
+      "dimension": "Validity",
+      "business_label": "No cross-field trade anomaly",
+      "columns": [
+        "risk_score",
+        "notional",
+        "quantity"
+      ],
+      "result_kind": "row",
+      "sql": "py_record_anomaly(risk_score, notional, quantity)",
+      "requires": [
+        "py_record_anomaly"
+      ]
+    },
+    {
+      "id": "STAT_MEAN_BETWEEN",
+      "dimension": "Validity",
+      "business_label": "Average notional is in a sane band",
+      "columns": [
+        "notional"
+      ],
+      "result_kind": "aggregate",
+      "sql": "avg(CASE WHEN isfinite(notional) THEN notional END) BETWEEN 0 AND 1e9"
+    },
+    {
+      "id": "STAT_MIN_BETWEEN",
+      "dimension": "Validity",
+      "business_label": "Minimum notional is in range",
+      "columns": [
+        "notional"
+      ],
+      "result_kind": "aggregate",
+      "sql": "min(CASE WHEN isfinite(notional) THEN notional END) BETWEEN 0 AND 1e9"
+    },
+    {
+      "id": "STAT_MAX_BETWEEN",
+      "dimension": "Validity",
+      "business_label": "Maximum notional is in range",
+      "columns": [
+        "notional"
+      ],
+      "result_kind": "aggregate",
+      "sql": "max(CASE WHEN isfinite(notional) THEN notional END) BETWEEN 0 AND 1e12"
+    },
+    {
+      "id": "STAT_SUM_BETWEEN",
+      "dimension": "Validity",
+      "business_label": "Total notional is in the expected range",
+      "columns": [
+        "notional"
+      ],
+      "result_kind": "aggregate",
+      "sql": "sum(CASE WHEN isfinite(notional) THEN notional END) BETWEEN 0 AND 1e18"
+    },
+    {
+      "id": "STAT_MODE_IN_SET",
+      "dimension": "Validity",
+      "business_label": "Most common currency is expected",
+      "columns": [
+        "currency"
+      ],
+      "result_kind": "aggregate",
+      "sql": "mode(currency) IN ('USD','EUR','GBP')"
+    },
+    {
+      "id": "MULT_FIELD_CORRELATION",
+      "dimension": "Consistency",
+      "business_label": "Quantity and notional move together",
+      "columns": [
+        "quantity",
+        "notional"
+      ],
+      "result_kind": "aggregate",
+      "sql": "corr(quantity, CASE WHEN isfinite(notional) THEN notional END) BETWEEN 0.05 AND 1.0"
+    },
+    {
+      "id": "TIMELINESS_FRESHNESS",
+      "dimension": "Timeliness",
+      "business_label": "The feed is fresh (booked within the last week)",
+      "columns": [
+        "booked_ts"
+      ],
+      "result_kind": "aggregate",
+      "sql": "max(booked_ts) >= now() - INTERVAL 7 DAY"
+    },
+    {
+      "id": "UNIQ_DUPLICATES_EXACT",
+      "dimension": "Uniqueness",
+      "business_label": "No duplicate trade IDs",
+      "columns": [
+        "trade_id"
+      ],
+      "result_kind": "dedup",
+      "variant": "exact"
+    },
+    {
+      "id": "UNIQ_DUPLICATES_APPROX",
+      "dimension": "Uniqueness",
+      "business_label": "Heavy-duplication screen on trade ID (fast estimate)",
+      "columns": [
+        "trade_id"
+      ],
+      "result_kind": "dedup",
+      "variant": "approx"
+    },
+    {
+      "id": "MULT_FIELD_DUPLICATES_EXACT",
+      "dimension": "Uniqueness",
+      "business_label": "Same trade ID booked more than once on a date",
+      "columns": [
+        "trade_id",
+        "trade_date"
+      ],
+      "result_kind": "dedup",
+      "variant": "exact"
+    },
+    {
+      "id": "MULT_FIELD_DUPLICATES_APPROX",
+      "dimension": "Uniqueness",
+      "business_label": "Heavy-duplication screen on trade ID and date (fast estimate)",
+      "columns": [
+        "trade_id",
+        "trade_date"
+      ],
+      "result_kind": "dedup",
+      "variant": "approx"
+    }
+  ]
+}
