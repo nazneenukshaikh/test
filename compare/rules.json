@@ -1,0 +1,229 @@
+{
+  "dataset": "dataset",
+  "parquet_path": "C:\\Users\\Shadab\\Personal_Projects\\DUCKDB\\dq-engine-compare\\dataset.parquet",
+  "rules": [
+    {
+      "id": "COMP_IS_NULL",
+      "dimension": "Completeness",
+      "business_label": "Nullable field contains nulls as expected",
+      "columns": [
+        "c_any_nullable"
+      ],
+      "result_kind": "aggregate",
+      "sql": "count(*) FILTER (WHERE c_any_nullable IS NULL) >= 1",
+      "expected": "PASS"
+    },
+    {
+      "id": "COMP_NOT_NULL",
+      "dimension": "Completeness",
+      "business_label": "Field is always present",
+      "columns": [
+        "c_any_required"
+      ],
+      "result_kind": "row",
+      "sql": "c_any_required IS NOT NULL",
+      "expected": "FAIL"
+    },
+    {
+      "id": "STAT_MAX_BETWEEN",
+      "dimension": "Validity",
+      "business_label": "Maximum is within range",
+      "columns": [
+        "n_max"
+      ],
+      "result_kind": "aggregate",
+      "sql": "max(n_max) BETWEEN 0 AND 1000",
+      "expected": "FAIL"
+    },
+    {
+      "id": "STAT_MIN_BETWEEN",
+      "dimension": "Validity",
+      "business_label": "Minimum is within range",
+      "columns": [
+        "n_min"
+      ],
+      "result_kind": "aggregate",
+      "sql": "min(n_min) BETWEEN 0 AND 1000",
+      "expected": "PASS"
+    },
+    {
+      "id": "STAT_SUM_BETWEEN",
+      "dimension": "Validity",
+      "business_label": "Sum is within range",
+      "columns": [
+        "n_sum"
+      ],
+      "result_kind": "aggregate",
+      "sql": "sum(n_sum) BETWEEN 0 AND 100000000000",
+      "expected": "FAIL"
+    },
+    {
+      "id": "STAT_MEAN_BETWEEN",
+      "dimension": "Validity",
+      "business_label": "Mean is within range",
+      "columns": [
+        "n_sum"
+      ],
+      "result_kind": "aggregate",
+      "sql": "avg(n_sum) BETWEEN 0 AND 1000",
+      "expected": "FAIL"
+    },
+    {
+      "id": "STAT_MEDIAN_BETWEEN",
+      "dimension": "Validity",
+      "business_label": "Median is within range",
+      "columns": [
+        "n_median"
+      ],
+      "result_kind": "aggregate",
+      "sql": "median(n_median) BETWEEN 0 AND 1000",
+      "expected": "PASS"
+    },
+    {
+      "id": "STAT_STDDEV_BETWEEN",
+      "dimension": "Validity",
+      "business_label": "Standard deviation is within range",
+      "columns": [
+        "n_stddev"
+      ],
+      "result_kind": "aggregate",
+      "sql": "stddev_samp(n_stddev) BETWEEN 0 AND 1000",
+      "expected": "PASS"
+    },
+    {
+      "id": "STAT_MODE_IN_SET",
+      "dimension": "Validity",
+      "business_label": "Most common value is expected",
+      "columns": [
+        "cat_mode"
+      ],
+      "result_kind": "aggregate",
+      "sql": "mode(cat_mode) IN ('A','B','C')",
+      "expected": "PASS"
+    },
+    {
+      "id": "VAL_BETWEEN",
+      "dimension": "Validity",
+      "business_label": "Value is within range",
+      "columns": [
+        "n_between"
+      ],
+      "result_kind": "row",
+      "sql": "n_between BETWEEN 0 AND 100",
+      "expected": "FAIL"
+    },
+    {
+      "id": "VAL_LENGTH_BETWEEN",
+      "dimension": "Validity",
+      "business_label": "Text length is within range",
+      "columns": [
+        "s_len"
+      ],
+      "result_kind": "row",
+      "sql": "length(s_len) BETWEEN 3 AND 10",
+      "expected": "FAIL"
+    },
+    {
+      "id": "VAL_IN_SET",
+      "dimension": "Validity",
+      "business_label": "Value is in the allowed set",
+      "columns": [
+        "cat_in"
+      ],
+      "result_kind": "row",
+      "sql": "cat_in IN ('X','Y','Z')",
+      "expected": "FAIL"
+    },
+    {
+      "id": "VAL_NOT_IN_SET",
+      "dimension": "Validity",
+      "business_label": "Value is not in the blocked set",
+      "columns": [
+        "cat_not_in"
+      ],
+      "result_kind": "row",
+      "sql": "cat_not_in NOT IN ('BAD','BANNED')",
+      "expected": "PASS"
+    },
+    {
+      "id": "VAL_REGEX_MATCH",
+      "dimension": "Validity",
+      "business_label": "Text matches the required pattern",
+      "columns": [
+        "s_regex"
+      ],
+      "result_kind": "row",
+      "sql": "regexp_matches(s_regex,'^[A-Z]{3}[0-9]{3}$')",
+      "expected": "FAIL"
+    },
+    {
+      "id": "VAL_REGEX_NOT_MATCH",
+      "dimension": "Validity",
+      "business_label": "Text does not match the blocked pattern",
+      "columns": [
+        "s_regex_not"
+      ],
+      "result_kind": "row",
+      "sql": "NOT regexp_matches(s_regex_not,'[0-9]')",
+      "expected": "PASS"
+    },
+    {
+      "id": "UNIQ_DISTINCT_COUNT_PROP_EXACT",
+      "dimension": "Uniqueness",
+      "business_label": "Proportion of distinct values is within range",
+      "columns": [
+        "id_prop"
+      ],
+      "result_kind": "aggregate",
+      "sql": "(count(DISTINCT id_prop) * 1.0 / count(*)) BETWEEN 0.99 AND 1.0",
+      "expected": "PASS"
+    },
+    {
+      "id": "UNIQ_DISTINCT_COUNT_EXACT",
+      "dimension": "Uniqueness",
+      "business_label": "Number of distinct values is as expected",
+      "columns": [
+        "cat_distinct"
+      ],
+      "result_kind": "aggregate",
+      "sql": "count(DISTINCT cat_distinct) BETWEEN 1 AND 12",
+      "expected": "FAIL"
+    },
+    {
+      "id": "MULT_FIELD_COMPARE_GT",
+      "dimension": "Consistency",
+      "business_label": "High value is greater than low value",
+      "columns": [
+        "n_gt_hi",
+        "n_gt_lo"
+      ],
+      "result_kind": "row",
+      "sql": "n_gt_hi > n_gt_lo",
+      "expected": "FAIL"
+    },
+    {
+      "id": "MULT_FIELD_COMPARE_EQ",
+      "dimension": "Consistency",
+      "business_label": "Two dates are equal",
+      "columns": [
+        "d_eq_a",
+        "d_eq_b"
+      ],
+      "result_kind": "row",
+      "sql": "d_eq_a = d_eq_b",
+      "expected": "PASS"
+    },
+    {
+      "id": "MULT_FIELD_DUPLICATES_EXACT",
+      "dimension": "Uniqueness",
+      "business_label": "No duplicate rows on the composite key",
+      "columns": [
+        "dup_a",
+        "dup_b"
+      ],
+      "result_kind": "aggregate",
+      "sql": "count(*) = count(DISTINCT (dup_a, dup_b))",
+      "expected": "PASS"
+    }
+  ]
+}

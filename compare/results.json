@@ -1,0 +1,128 @@
+{
+  "parquet": "C:\\Users\\Shadab\\Personal_Projects\\DUCKDB\\dq-engine-compare\\dataset.parquet",
+  "rows": 50000000,
+  "results": [
+    {
+      "id": "COMP_IS_NULL",
+      "result_kind": "aggregate",
+      "failed_count": 0,
+      "status": "PASS"
+    },
+    {
+      "id": "COMP_NOT_NULL",
+      "result_kind": "row",
+      "failed_count": 1049500,
+      "status": "FAIL"
+    },
+    {
+      "id": "STAT_MAX_BETWEEN",
+      "result_kind": "aggregate",
+      "failed_count": 1,
+      "status": "FAIL"
+    },
+    {
+      "id": "STAT_MIN_BETWEEN",
+      "result_kind": "aggregate",
+      "failed_count": 0,
+      "status": "PASS"
+    },
+    {
+      "id": "STAT_SUM_BETWEEN",
+      "result_kind": "aggregate",
+      "failed_count": 1,
+      "status": "FAIL"
+    },
+    {
+      "id": "STAT_MEAN_BETWEEN",
+      "result_kind": "aggregate",
+      "failed_count": 1,
+      "status": "FAIL"
+    },
+    {
+      "id": "STAT_MEDIAN_BETWEEN",
+      "result_kind": "aggregate",
+      "failed_count": 0,
+      "status": "PASS"
+    },
+    {
+      "id": "STAT_STDDEV_BETWEEN",
+      "result_kind": "aggregate",
+      "failed_count": 0,
+      "status": "PASS"
+    },
+    {
+      "id": "STAT_MODE_IN_SET",
+      "result_kind": "aggregate",
+      "failed_count": 0,
+      "status": "PASS"
+    },
+    {
+      "id": "VAL_BETWEEN",
+      "result_kind": "row",
+      "failed_count": 281500,
+      "status": "FAIL"
+    },
+    {
+      "id": "VAL_LENGTH_BETWEEN",
+      "result_kind": "row",
+      "failed_count": 594000,
+      "status": "FAIL"
+    },
+    {
+      "id": "VAL_IN_SET",
+      "result_kind": "row",
+      "failed_count": 529000,
+      "status": "FAIL"
+    },
+    {
+      "id": "VAL_NOT_IN_SET",
+      "result_kind": "row",
+      "failed_count": 0,
+      "status": "PASS"
+    },
+    {
+      "id": "VAL_REGEX_MATCH",
+      "result_kind": "row",
+      "failed_count": 1170500,
+      "status": "FAIL"
+    },
+    {
+      "id": "VAL_REGEX_NOT_MATCH",
+      "result_kind": "row",
+      "failed_count": 0,
+      "status": "PASS"
+    },
+    {
+      "id": "UNIQ_DISTINCT_COUNT_PROP_EXACT",
+      "result_kind": "aggregate",
+      "failed_count": 0,
+      "status": "PASS"
+    },
+    {
+      "id": "UNIQ_DISTINCT_COUNT_EXACT",
+      "result_kind": "aggregate",
+      "failed_count": 1,
+      "status": "FAIL"
+    },
+    {
+      "id": "MULT_FIELD_COMPARE_GT",
+      "result_kind": "row",
+      "failed_count": 1096000,
+      "status": "FAIL"
+    },
+    {
+      "id": "MULT_FIELD_COMPARE_EQ",
+      "result_kind": "row",
+      "failed_count": 0,
+      "status": "PASS"
+    },
+    {
+      "id": "MULT_FIELD_DUPLICATES_EXACT",
+      "result_kind": "aggregate",
+      "failed_count": 0,
+      "status": "PASS"
+    }
+  ],
+  "failed_rules": 10,
+  "passed_rules": 10
+}
